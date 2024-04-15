@@ -1,4 +1,5 @@
 import threading
+
 import numpy as np
 import time
 
@@ -20,6 +21,7 @@ def handle_requests():
     while requests:
         p_threads = []
         with condition:
+            # make it using a pool of threads
             for request in requests:
                 # Create a new thread to process the request
                 producer_thread = threading.Thread(target=produtora,args=(request,))

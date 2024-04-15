@@ -2,34 +2,24 @@ import socket
 import json
 import time
 from auth.client import auth
+from gamestate import GameState
 
-host = 'slardar.snes.2advanced.dev'
-port = 51001
+host = 'pugna.snes.dcc.ufmg.br'
+port = 51001 
 command = ["itr","2021032218",20]
 token1  = auth(host,port,command)
 
-command = ["itr","2021032218",20]
+command = ["itr","2021031947",20]
 token2  = auth(host,port,command)
 
-command = ["gtr",token1,token2]
+command = ["gtr","2",token1,token2]
 token   = auth(host,port,command)
 
+g = GameState(host,51111,token=token)
 
-# Create a UDP socket
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-# Example usage:
-try:
-    # Send a message
-    message = {'auth': token, 'type': 'authreq'}
-    json_message = json.dumps(message)
-    sock.sendto(json_message.encode(), (host,port))
+g.authreq(token)
+g.getcannons()
 
-    data, addr = sock.recvfrom(1024)
-    data =  json.loads(data.decode())
-    print("Received message:", data)
-
-except KeyboardInterrupt:
-    print("Exiting...")
-finally:
-    sock.close()
+while(g.getturn()):
+    g.quit()

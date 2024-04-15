@@ -44,7 +44,7 @@ def auth(host,port,command):
         
         # If isin't a error message, continue
         r = messager_obj.response(response)
-        print(r)
+        # print(r)
         return r
         
     except socket.timeout:
