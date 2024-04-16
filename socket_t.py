@@ -14,13 +14,13 @@ class Socket:
         self.socket.settimeout(0.1)
         return self.socket
 
-    def sendto(self,message):
+    def sendto(self,message,n_responses=1):
         """ Principal method. Send a requisition and process the response. Uses stop-and-wait to be reliable"""
 
         responses = []
         json_message = json.dumps(message)
         self.socket.sendto(json_message.encode(), (self.host,self.port))
-        while True: 
+        while len(responses) < n_responses: 
         # While it can recieve something, recieves
             try:    
                 data, addr = self.socket.recvfrom(1024)
@@ -28,6 +28,7 @@ class Socket:
                 if(data["type"] == "gameover"): 
                     raise GameOver()
                 responses.append(data)
+                
             
 
             except socket.timeout:
