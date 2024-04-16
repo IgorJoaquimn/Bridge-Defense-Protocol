@@ -91,21 +91,21 @@ class GameState:
         possible_targets = {}  
         for cannon in self.cannons:
             x, y = cannon  
-            targets = set()  
+            positions = set()  
 
             if y == 0:
-                targets.add((x, 1))  # Cannon at y=0 can fire at river 1
+                positions.add((x, 1))  # Cannon at y=0 can fire at river 1
             elif y == 4:
-                targets.add((x, 4))  # Cannon at y=4 can fire at river 4
+                positions.add((x, 4))  # Cannon at y=4 can fire at river 4
             else:
-                targets.add((x, y - 1))  # Cannon can fire at the river above
-                targets.add((x, y + 1))  # Cannon can fire at the river below
+                positions.add((x, y - 1))  # Cannon can fire at the river above
+                positions.add((x, y + 1))  # Cannon can fire at the river below
             
 
             # Get only the boats that are in a certain position
-            for boat_x, boat_y in targets:
-                river  = self.rivers[boat_y -1]
-                ships = river.ships[boat_x -1]
+            for pos_x, pos_y in positions:
+                river  = self.rivers[pos_y -1]
+                ships = river.ships[pos_x -1]
                 if(ships):
                     # Initialize possible_targets[x] if not exists
                     if x not in possible_targets:
@@ -114,8 +114,27 @@ class GameState:
                     if y not in possible_targets[x]:
                         possible_targets[x][y] = []
 
-                    possible_targets[x][y] += [river.get_weakest_boat(boat_x-1)]
+                    possible_targets[x][y] += ships
         return possible_targets
+    
+    def get_weakest_boat(self,boats):
+        """ Get the boat that recieves least hits in a certain bridge."""
+
+        life = {
+            "frigate":	  1,
+            "destroyer":  2,
+            "battleship": 3
+        } 
+
+        weakest_boat = boats[0]
+        weakest_boat["life"] = life[weakest_boat["hull"]] -  weakest_boat["hits"]
+        
+        for boat in boats:
+            boat["life"] = life[boat["hull"]] -  boat["hits"]
+            if boat["hits"] > weakest_boat["hits"]:
+                weakest_boat = boat
+        
+        return weakest_boat
     
     def shot_strategy(self):
         """ Define the shotting strategy. Should return, to each cannon being fired, the cannon [x,y] and the id of the boat (x,y,id)
@@ -126,7 +145,7 @@ class GameState:
 
         for x, y_dict in possible_targets.items():
             for y, boats in y_dict.items():
-                 self.shot_list.append((x,y,boats[0]))
+                 self.shot_list.append((x,y,self.get_weakest_boat(boats)))
         return self.shot_list
 
 class River:
@@ -134,13 +153,4 @@ class River:
         self.river_id = river_id  
         self.ships = [[] for i in range(8)]
 
-    def get_weakest_boat(self,bridge_id):
-        """ Get the boat that recieves least hits in a certain bridge."""
-        boats = self.ships[bridge_id]  
-        weakest_boat = boats[0]
-        
-        for boat in boats:
-            if boat["hits"] > weakest_boat["hits"]:
-                weakest_boat = boat
-        
-        return weakest_boat
+    
