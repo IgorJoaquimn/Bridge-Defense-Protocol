@@ -18,8 +18,12 @@ token   = auth(host,port,command)
 g = GameState(host,51111,token=token)
 
 
-g.authreq(token)
+g.authreq()
 g.getcannons()
 
-while(g.getturn()):
-    g.quit()
+while(g.getturn()  and (g.turn <= 5)):
+    print(g.shot_strategy())
+    g.turn += 1
+
+g.quit()
+
