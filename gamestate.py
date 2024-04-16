@@ -105,8 +105,8 @@ class GameState:
             # Get only the boats that are in a certain position
             for boat_x, boat_y in targets:
                 river  = self.rivers[boat_y -1]
-                bridge = river.ships[boat_x -1]
-                if(bridge):
+                ships = river.ships[boat_x -1]
+                if(ships):
                     # Initialize possible_targets[x] if not exists
                     if x not in possible_targets:
                         possible_targets[x]    = {}
