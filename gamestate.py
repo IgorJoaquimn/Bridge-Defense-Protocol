@@ -61,6 +61,8 @@ class GameState:
                             "auth": self.auth_token,  
                             "turn": self.turn
                             }
+                
+                self.rivers[i].ships = [[] for i in range(8)]
 
                 states = sock.sendto(message) 
                 for state in states: # process each state
@@ -68,11 +70,38 @@ class GameState:
                         ship["river"] = i 
 
                     self.rivers[i].ships[state["bridge"]-1] += state["ships"] # save the ships to the ith-river in the corresponding brigde
-
             except GameOver as e:
                 return False # False means that something goes wrong with the requisition
         
         return states
+    
+    def send_shot(self):
+        """ """
+        self.shot_list = self.shot_strategy()
+        for shot in self.shot_list:
+            self.shot_message(shot)
+
+    def shot_message(self,shot):
+        """ """
+        x,y,ship = shot
+        try:
+            message = {
+                        "type": "shot",
+                        "auth": self.auth_token,  
+                        "cannon": [x,y],
+                        "id": ship["id"]
+                        }
+
+            shotresp = self.sockets[ship["river"]].sendto(message) 
+            if(shotresp["status"] != 0):
+                raise ServerError
+            return shotresp
+            
+            
+        except GameOver as e:
+            return False # False means that something goes wrong with the requisition
+
+        
     
     def quit(self):
         try:
@@ -98,7 +127,7 @@ class GameState:
             elif y == 4:
                 positions.add((x, 4))  # Cannon at y=4 can fire at river 4
             else:
-                positions.add((x, y - 1))  # Cannon can fire at the river above
+                positions.add((x, y))  # Cannon can fire at the river above
                 positions.add((x, y + 1))  # Cannon can fire at the river below
             
 

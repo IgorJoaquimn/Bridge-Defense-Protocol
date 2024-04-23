@@ -22,7 +22,7 @@ g.authreq()
 g.getcannons()
 
 while(g.getturn()  and (g.turn <= 5)):
-    print(g.shot_strategy())
+    g.send_shot()
     g.turn += 1
 
 g.quit()
