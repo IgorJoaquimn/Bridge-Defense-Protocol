@@ -64,7 +64,7 @@ class GameState:
                 
                 self.rivers[i].ships = [[] for i in range(8)]
 
-                states = sock.sendto(message) 
+                states = sock.sendto(message,8) 
                 for state in states: # process each state
                     for ship in state["ships"]: # save the corresponding river
                         ship["river"] = i 
