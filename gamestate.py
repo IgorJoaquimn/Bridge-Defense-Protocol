@@ -1,4 +1,6 @@
 from socket_t import *
+import threading
+from concurrent.futures import ThreadPoolExecutor as tpe
 
 class GameState:
     """ The GameState class is responsable send requests to the server and control the board"""
@@ -14,6 +16,9 @@ class GameState:
 
         self.sockets = [Socket(host,port+i) for i in range(4)]
         self.shot_list = []
+
+        self.condition = threading.Condition()
+
     
     def __del__(self):
         """ Every socket created must be closed"""
@@ -33,7 +38,7 @@ class GameState:
                 print("Exiting...")
             except GameOver as e:
                 print("A error occurs...",e.message)
-                self.quit()
+                m = self.quit()
                 return self.authreq()
 
         return data
@@ -76,39 +81,79 @@ class GameState:
         return states
     
     def send_shot(self):
-        """ """
+
         self.shot_list = self.shot_strategy()
-        for shot in self.shot_list:
-            self.shot_message(shot)
+
+        threads = []
+
+        for i in range(4):
+            consumer_thread = threading.Thread(target = self.receive_shot,args=(i,))
+            consumer_thread.start()
+            threads.append(consumer_thread)
+
+        while self.shot_list:
+            with tpe(max_workers=5) as executor:
+                p_threads = []
+                with self.condition:
+                    # make it using a pool of threads
+                    for shot in self.shot_list:
+                        # Create a new thread to process the request
+                        p_threads.append(executor.submit(self.shot_message,shot))
+
+                for thread in p_threads:
+                    thread.result()
+
+
+            with self.condition:
+                self.condition.notify_all()
+
+        with self.condition:
+                self.condition.notify_all()
+
+        for thread in threads:
+            thread.join()
 
     def shot_message(self,shot):
         """ """
-        x,y,ship = shot
+        x,y,id,river = shot
         try:
             message = {
                         "type": "shot",
                         "auth": self.auth_token,  
                         "cannon": [x,y],
-                        "id": ship["id"]
+                        "id": id
                         }
 
-            shotresp = self.sockets[ship["river"]].sendto(message) 
-            if(shotresp["status"] != 0):
-                raise ServerError
-            return shotresp
+            self.sockets[river].send(message) 
+            
             
             
         except GameOver as e:
             return False # False means that something goes wrong with the requisition
 
-        
+    def receive_shot(self,river):
+        while(self.shot_list):
+            with self.condition:
+                self.condition.wait()  # Wait until notified by the producer
+                if(not self.shot_list):
+                    break
+                response = self.sockets[river].listen()
+                if(response):
+                    x,y = response["cannon"]
+                    id = response["id"]
+                    try:
+                        self.shot_list.remove((x,y,id,river))
+                    except:
+                        pass
+        while(self.sockets[river].listen() != None):
+            continue
     
     def quit(self):
         try:
             message = {'auth': self.auth_token, 'type': 'quit'}
             for sock in self.sockets:
                 # Send quit message to each server
-                sock.sendto(message)
+                return sock.sendto(message)
 
         except KeyboardInterrupt:
             print("Exiting...")
@@ -169,13 +214,14 @@ class GameState:
         """ Define the shotting strategy. Should return, to each cannon being fired, the cannon [x,y] and the id of the boat (x,y,id)
             Currently, shoot the first one
             """
-        self.shot_list = []
+        shot_list = []
         possible_targets = self.get_possible_targets()
 
         for x, y_dict in possible_targets.items():
             for y, boats in y_dict.items():
-                 self.shot_list.append((x,y,self.get_weakest_boat(boats)))
-        return self.shot_list
+                ship = self.get_weakest_boat(boats)
+                shot_list.append((x,y,ship["id"],ship["river"]))
+        return set(shot_list)
 
 class River:
     def __init__(self, river_id):

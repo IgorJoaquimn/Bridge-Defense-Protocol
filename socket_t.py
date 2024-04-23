@@ -13,6 +13,29 @@ class Socket:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.settimeout(0.1)
         return self.socket
+    
+    def send(self,message):
+        json_message = json.dumps(message)
+        self.socket.sendto(json_message.encode(), (self.host,self.port))
+
+    def listen(self):
+
+        try:    
+            data, addr = self.socket.recvfrom(1024)
+            data =  json.loads(data.decode())
+            if(data["type"] == "gameover"): 
+                raise GameOver()
+            return data
+        
+        except socket.timeout:
+            return None
+        
+        except json.decoder.JSONDecodeError as e:
+        # For some reason, some error messages from servers isin't json decodable, must investigate why
+            if("gameover" in str(data)):
+                raise GameOver()
+
+
 
     def sendto(self,message,n_responses=1):
         """ Principal method. Send a requisition and process the response. Uses stop-and-wait to be reliable"""
@@ -33,7 +56,7 @@ class Socket:
 
             except socket.timeout:
             # Builtin stop-and-wait, if no previous data comes from the server in ONE timeout, must resend the message
-                if(not len(responses)):
+                if(len(responses) != n_responses):
                     return self.sendto(message)
             # Case the server already sended all its information, stops listening
                 break

@@ -21,7 +21,7 @@ g = GameState(host,51111,token=token)
 g.authreq()
 g.getcannons()
 
-while(g.getturn()  and (g.turn <= 5)):
+while(g.getturn()  and (g.turn <= 10)):
     g.send_shot()
     g.turn += 1
 
