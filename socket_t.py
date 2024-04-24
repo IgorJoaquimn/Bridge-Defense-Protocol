@@ -40,26 +40,36 @@ class Socket:
     def sendto(self,message,n_responses=1):
         """ Principal method. Send a requisition and process the response. Uses stop-and-wait to be reliable"""
 
+        response_type = {
+            "authreq": "authresp",
+            "getcannons": "cannons",
+            "getturn": "state",
+            "shot": "shotresp"
+        }
+
         responses = []
+        type = message["type"]
         json_message = json.dumps(message)
         self.socket.sendto(json_message.encode(), (self.host,self.port))
         while len(responses) < n_responses: 
         # While it can recieve something, recieves
             try:    
-                data, addr = self.socket.recvfrom(1024)
+                data, addr = self.socket.recvfrom(2048)
                 data =  json.loads(data.decode())
                 if(data["type"] == "gameover"): 
                     raise GameOver()
-                responses.append(data)
+                if(type == "quit"):
+                    break
+                if(data["type"] == response_type[type]):
+                    responses.append(data)
                 
             
 
             except socket.timeout:
             # Builtin stop-and-wait, if no previous data comes from the server in ONE timeout, must resend the message
                 if(len(responses) != n_responses):
-                    return self.sendto(message)
+                    return self.sendto(message,n_responses)
             # Case the server already sended all its information, stops listening
-                break
 
             except json.decoder.JSONDecodeError as e:
             # For some reason, some error messages from servers isin't json decodable, must investigate why

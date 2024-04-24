@@ -15,8 +15,7 @@ token2  = auth(host,port,command)
 command = ["gtr","2",token1,token2]
 token   = auth(host,port,command)
 
-g = GameState(host,51111,token=token)
-
+g = GameState(host,51211,token=token)
 
 g.authreq()
 g.getcannons()

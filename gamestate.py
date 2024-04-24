@@ -125,9 +125,7 @@ class GameState:
                         }
 
             self.sockets[river].send(message) 
-            
-            
-            
+             
         except GameOver as e:
             return False # False means that something goes wrong with the requisition
 
@@ -139,12 +137,14 @@ class GameState:
                     break
                 response = self.sockets[river].listen()
                 if(response):
+                    if(response["status"]!=0):
+                        raise ServerError(message = "Shot gone wrong"+str(response))
                     x,y = response["cannon"]
                     id = response["id"]
-                    try:
-                        self.shot_list.remove((x,y,id,river))
-                    except:
-                        pass
+                    shot = (x,y,id,river)
+                    if(shot in self.shot_list):
+                        self.shot_list.remove(shot)
+                    
         while(self.sockets[river].listen() != None):
             continue
     
