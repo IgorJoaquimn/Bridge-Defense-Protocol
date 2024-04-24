@@ -15,12 +15,12 @@ token2  = auth(host,port,command)
 command = ["gtr","2",token1,token2]
 token   = auth(host,port,command)
 
-g = GameState(host,51211,token=token)
+g = GameState(host,51311,token=token)
 
 g.authreq()
 g.getcannons()
 
-while(g.getturn()  and (g.turn <= 10)):
+while(g.getturn()):
     g.send_shot()
     g.turn += 1
 

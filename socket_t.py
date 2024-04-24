@@ -50,16 +50,20 @@ class Socket:
         responses = []
         type = message["type"]
         json_message = json.dumps(message)
-        self.socket.sendto(json_message.encode(), (self.host,self.port))
+        try:
+            self.socket.sendto(json_message.encode(), (self.host,self.port))
+        except Exception as e:
+            print(e)
+            raise GameOver
         while len(responses) < n_responses: 
         # While it can recieve something, recieves
             try:    
                 data, addr = self.socket.recvfrom(2048)
                 data =  json.loads(data.decode())
                 if(data["type"] == "gameover"): 
-                    raise GameOver()
+                    raise GameOver(data=data)
                 if(type == "quit"):
-                    break
+                    return data
                 if(data["type"] == response_type[type]):
                     responses.append(data)
                 
@@ -102,6 +106,7 @@ class ServerError(Exception):
 class GameOver(ServerError):
     """Custom exception for GameOvers errors."""
 
-    def __init__(self, message="GameOver"):
+    def __init__(self, message="GameOver",data=""):
         self.message = message
+        self.data = data
         super().__init__(self.message)

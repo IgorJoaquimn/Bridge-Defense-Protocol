@@ -1,6 +1,7 @@
 from socket_t import *
 import threading
 from concurrent.futures import ThreadPoolExecutor as tpe
+from concurrent.futures import as_completed
 
 class GameState:
     """ The GameState class is responsable send requests to the server and control the board"""
@@ -14,6 +15,8 @@ class GameState:
         self.state = []
         self.rivers = [River(i) for i in range(1,5)]
 
+        self.host = host
+        self.port = port
         self.sockets = [Socket(host,port+i) for i in range(4)]
         self.shot_list = []
 
@@ -37,8 +40,15 @@ class GameState:
             except KeyboardInterrupt:
                 print("Exiting...")
             except GameOver as e:
+                if("ongoing game" in e.data["description"]):
+                    self.quit()
+                    for s in self.sockets:
+                        s.close()
+                    self.sockets = [Socket(self.host,self.port+i) for i in range(4)]
+
+
                 print("A error occurs...",e.message)
-                m = self.quit()
+                # m = self.quit()
                 return self.authreq()
 
         return data
@@ -56,29 +66,43 @@ class GameState:
         
         return data
 
+    def getturn_one_server(self,i):
+        try:
+            message = {
+                        "type": "getturn",
+                        "auth": self.auth_token,  
+                        "turn": self.turn
+                        }
+            
+            self.rivers[i].ships = [[] for i in range(8)]
+
+            states = self.sockets[i].sendto(message,8) 
+            for state in states: # process each state
+                for ship in state["ships"]: # save the corresponding river
+                    ship["river"] = i 
+
+                self.rivers[i].ships[state["bridge"]-1] += state["ships"] # save the ships to the ith-river in the corresponding brigde
+        
+        except GameOver as e:
+            print(e.data)
+            print(self.turn)
+            return False # False means that something goes wrong with the requisition
+        
+        return True
+        
     def getturn(self):
         """ The client program should advance the state of the game by sending a getturn request to servers."""
 
-        for i,sock in enumerate(self.sockets): # for every server
-            try:
-                message = {
-                            "type": "getturn",
-                            "auth": self.auth_token,  
-                            "turn": self.turn
-                            }
-                
-                self.rivers[i].ships = [[] for i in range(8)]
+        with tpe(max_workers=4) as executor:
+            p_threads = []
+            for i in range(len(self.sockets)):
+                p_threads.append(executor.submit(self.getturn_one_server,i))
 
-                states = sock.sendto(message,8) 
-                for state in states: # process each state
-                    for ship in state["ships"]: # save the corresponding river
-                        ship["river"] = i 
-
-                    self.rivers[i].ships[state["bridge"]-1] += state["ships"] # save the ships to the ith-river in the corresponding brigde
-            except GameOver as e:
-                return False # False means that something goes wrong with the requisition
-        
-        return states
+            goes_right = True
+            for future in as_completed(p_threads):
+                goes_right = goes_right and future.result()
+    
+        return goes_right
     
     def send_shot(self):
 
@@ -99,10 +123,8 @@ class GameState:
                     for shot in self.shot_list:
                         # Create a new thread to process the request
                         p_threads.append(executor.submit(self.shot_message,shot))
-
                 for thread in p_threads:
                     thread.result()
-
 
             with self.condition:
                 self.condition.notify_all()
@@ -125,28 +147,32 @@ class GameState:
                         }
 
             self.sockets[river].send(message) 
+            with self.condition:
+                self.condition.notify_all()
              
-        except GameOver as e:
-            return False # False means that something goes wrong with the requisition
+        except:
+            pass
 
     def receive_shot(self,river):
         while(self.shot_list):
             with self.condition:
                 self.condition.wait()  # Wait until notified by the producer
-                if(not self.shot_list):
-                    break
-                response = self.sockets[river].listen()
-                if(response):
-                    if(response["status"]!=0):
-                        raise ServerError(message = "Shot gone wrong"+str(response))
-                    x,y = response["cannon"]
-                    id = response["id"]
-                    shot = (x,y,id,river)
-                    if(shot in self.shot_list):
-                        self.shot_list.remove(shot)
+                if(not self.shot_list): break
+            
+            
+            response = self.sockets[river].listen()
+            if(response and (response["type"] == "shotresp")):
+
+                if(response["status"]!=0):
+                    raise ServerError(message = "Shot gone wrong"+str(response))
+                x,y = response["cannon"]
+                id = response["id"]
+                shot = (x,y,id,river)
+
+                with self.condition:
+                    if(shot in self.shot_list): self.shot_list.remove(shot)
                     
-        while(self.sockets[river].listen() != None):
-            continue
+        while(self.sockets[river].listen() != None): continue
     
     def quit(self):
         try:
