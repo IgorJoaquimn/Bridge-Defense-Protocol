@@ -12,7 +12,6 @@ class GameState:
 
         self.turn = 0 
         self.cannons = []
-        self.state = []
         self.rivers = [River(i) for i in range(1,5)]
 
         self.host = host
@@ -21,6 +20,8 @@ class GameState:
         self.shot_list = []
 
         self.condition = threading.Condition()
+
+        self.gameover = {}
 
     
     def __del__(self):
@@ -47,8 +48,6 @@ class GameState:
                     self.sockets = [Socket(self.host,self.port+i) for i in range(4)]
 
 
-                print("A error occurs...",e.message)
-                # m = self.quit()
                 return self.authreq()
 
         return data
@@ -61,8 +60,33 @@ class GameState:
             message = {'auth': self.auth_token, 'type': 'getcannons'}
             data = self.sockets[0].sendto(message)
             self.cannons = data["cannons"]
+
+            cannons = []
+
+            for cannon in self.cannons:
+                x, y = cannon  
+                positions = []
+                if y == 0:
+                    positions.append((x, 1))  # Cannon at y=0 can fire at river 1
+                elif y == 4:
+                    positions.append((x, 4))  # Cannon at y=4 can fire at river 4
+                else:
+                    positions.append((x, y))  # Cannon can fire at the river above
+                    positions.append((x, y + 1)) 
+                obj = {}
+                obj["x"] = x
+                obj["y"] = y
+                obj["pos"] = positions
+                cannons.append(obj)
+            self.cannons = cannons
+
         except ServerError as e:
-            print("A error occurs...",e.message)
+            pass
+
+        except GameOver as e:
+            pass
+        
+        
         
         return data
 
@@ -85,7 +109,10 @@ class GameState:
         
         except GameOver as e:
             print(e.data)
-            print(self.turn)
+            if( e.data['status']==0):
+                self.gameover["sunk_ships"] = e.data['score']['sunk_ships']
+                self.gameover["escaped_ships"] = e.data['score']['escaped_ships']
+                self.gameover["remaining_life_on_escaped_ships"] = e.data['score']['remaining_life_on_escaped_ships']
             return False # False means that something goes wrong with the requisition
         
         return True
@@ -171,6 +198,7 @@ class GameState:
 
                 with self.condition:
                     if(shot in self.shot_list): self.shot_list.remove(shot)
+            
                     
         while(self.sockets[river].listen() != None): continue
     
@@ -190,20 +218,9 @@ class GameState:
         """ Get the potential targets for each cannon. Fist check if there is a boat in the position """
         possible_targets = {}  
         for cannon in self.cannons:
-            x, y = cannon  
-            positions = set()  
-
-            if y == 0:
-                positions.add((x, 1))  # Cannon at y=0 can fire at river 1
-            elif y == 4:
-                positions.add((x, 4))  # Cannon at y=4 can fire at river 4
-            else:
-                positions.add((x, y))  # Cannon can fire at the river above
-                positions.add((x, y + 1))  # Cannon can fire at the river below
-            
-
+            (x,y,pos) = cannon.values()
             # Get only the boats that are in a certain position
-            for pos_x, pos_y in positions:
+            for pos_x, pos_y in pos:
                 river  = self.rivers[pos_y -1]
                 ships = river.ships[pos_x -1]
                 if(ships):
@@ -217,6 +234,13 @@ class GameState:
                     possible_targets[x][y] += ships
         return possible_targets
     
+    def ship_not_in_shots(self,boat):
+        # Iterar sobre a lista de tiros para verificar se algum tem o mesmo 'id'
+        for (x,y,id,river) in self.shot_list:
+            if id == boat['id']:
+                return False  
+        return True  
+    
     def get_weakest_boat(self,boats):
         """ Get the boat that recieves least hits in a certain bridge."""
 
@@ -226,12 +250,18 @@ class GameState:
             "battleship": 3
         } 
 
+        safe_boat = boats[0]
+        boats = [boat for boat in boats if self.ship_not_in_shots(boat)]
+
+        if(not boats):
+            return safe_boat
+        
         weakest_boat = boats[0]
         weakest_boat["life"] = life[weakest_boat["hull"]] -  weakest_boat["hits"]
         
         for boat in boats:
             boat["life"] = life[boat["hull"]] -  boat["hits"]
-            if boat["hits"] > weakest_boat["hits"]:
+            if (boat["life"] < weakest_boat["life"]):
                 weakest_boat = boat
         
         return weakest_boat
@@ -240,14 +270,14 @@ class GameState:
         """ Define the shotting strategy. Should return, to each cannon being fired, the cannon [x,y] and the id of the boat (x,y,id)
             Currently, shoot the first one
             """
-        shot_list = []
+        self.shot_list = []
         possible_targets = self.get_possible_targets()
 
         for x, y_dict in possible_targets.items():
             for y, boats in y_dict.items():
                 ship = self.get_weakest_boat(boats)
-                shot_list.append((x,y,ship["id"],ship["river"]))
-        return set(shot_list)
+                self.shot_list.append((x,y,ship["id"],ship["river"]))
+        return set(self.shot_list)
 
 class River:
     def __init__(self, river_id):

@@ -8,9 +8,26 @@ class Socket:
         self.port = port
         self.socket = self.create_socket()
 
+    def determine_ip_type(self,hostname):
+        ip_address = socket.getaddrinfo(hostname, None)[0][4][0]
+        try:
+            socket.inet_pton(socket.AF_INET, ip_address)
+            return socket.AF_INET
+        except socket.error:
+            pass
+
+        try:
+            socket.inet_pton(socket.AF_INET6, ip_address)
+            return socket.AF_INET6
+        except socket.error:
+            pass
+
+        # If neither conversion succeeds, the resolved IP address is not a valid IPv4 or IPv6 address
+        return None
+
     def create_socket(self):
         # Create a TCP socket
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.socket = socket.socket(self.determine_ip_type(self.host), socket.SOCK_DGRAM)
         self.socket.settimeout(0.1)
         return self.socket
     

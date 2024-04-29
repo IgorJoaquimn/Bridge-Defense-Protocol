@@ -9,7 +9,7 @@ O projeto do Cliente do Bridge Defense é parte de um jogo inspirado em jogos de
 
 ## Tutorial de execução do código
 
-A interpretação do código se dá peço comando
+A interpretação do código se dá pelo comando
 
 ```bash
 python3 client.py $host $port $command
