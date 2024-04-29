@@ -108,11 +108,11 @@ class GameState:
                 self.rivers[i].ships[state["bridge"]-1] += state["ships"] # save the ships to the ith-river in the corresponding brigde
         
         except GameOver as e:
-            print(e.data)
-            if( e.data['status']==0):
-                self.gameover["sunk_ships"] = e.data['score']['sunk_ships']
-                self.gameover["escaped_ships"] = e.data['score']['escaped_ships']
-                self.gameover["remaining_life_on_escaped_ships"] = e.data['score']['remaining_life_on_escaped_ships']
+            if(e.data):
+                if(e.data['status'] == 0):
+                    self.gameover["sunk_ships"] = e.data['score']['sunk_ships']
+                    self.gameover["escaped_ships"] = e.data['score']['escaped_ships']
+                    self.gameover["remaining_life_on_escaped_ships"] = e.data['score']['remaining_life_on_escaped_ships']
             return False # False means that something goes wrong with the requisition
         
         return True
